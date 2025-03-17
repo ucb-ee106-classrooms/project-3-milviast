@@ -263,7 +263,6 @@ class DeadReckoning(Estimator):
                         [0, 1]]
             inputs = np.array([self.u[self.timeStep][1], self.u[self.timeStep][2]])
 
-            stateEstimate = np.copy(self.x_hat[self.timeStep])
             nextState = (model @ inputs)
 
             stateEstimate = np.zeros(6)

@@ -204,13 +204,46 @@ class DeadReckoning(Estimator):
     """
     def __init__(self, is_noisy=False):
         super().__init__(is_noisy)
+        self.index = 0
+        self.previousState = 0
         self.canvas_title = 'Dead Reckoning'
 
     def update(self, _):
-        if len(self.x_hat) > 0:
+        if len(self.x_hat) > 0 and len(self.u) > self.index:
             # TODO: Your implementation goes here!
             # You may ONLY use self.u and self.x[0] for estimation
-            raise NotImplementedError
+            if self.index == 0:
+                self.previousState = self.x[0]            
+            lastPhi = self.previousState[2]
+            model = np.array([[0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [-(np.sin(lastPhi) / self.m), 0],
+                        [(np.cos(lastPhi) / self.m), 0],
+                        [0, (1 / self.J)]])
+            inputs = np.array([self.u[self.index][0], self.u[self.index][1]])
+
+            # print("Model: ", model)
+            # print("Model Shape: ", model.shape)
+            # print("Inputs: ", inputs)
+            # print("Inputs Shape: ", inputs.shape)
+
+            nextState = (model @ inputs) + np.array([self.previousState[3], self.previousState[4], self.previousState[5], 0, -self.gr, 0])
+
+            # print("nextState: ", nextState)
+            # print("nextState Shape: ", nextState.shape)
+            # print("nextState type: ", type(nextState))
+
+            # print("Matrix Multiplication: ", model @ inputs)
+
+            stateEstimate = self.previousState + nextState * self.dt
+
+            # print("State Estimate: ", stateEstimate)
+            # print("SE Shape: ", stateEstimate.shape)
+
+            self.previousState = stateEstimate            
+            self.x_hat.append(stateEstimate)
+            self.index += 1
 
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):
