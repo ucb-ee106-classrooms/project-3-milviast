@@ -77,7 +77,7 @@ class Estimator:
         self.x = []
         self.y = []
         self.x_hat = []  # Your estimates go here!
-        self.dt = 0.1
+        self.dt = 0.05
         self.fig, self.axd = plt.subplot_mosaic(
             [['xy', 'phi'],
              ['xy', 'x'],
@@ -244,14 +244,48 @@ class DeadReckoning(Estimator):
     """
     def __init__(self):
         super().__init__()
+        self.timeStep = 0
+        self.previousState = 0
         self.canvas_title = 'Dead Reckoning'
 
     def update(self, _):
-        if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
+        if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0] and len(self.u) > self.timeStep:
             # TODO: Your implementation goes here!
             # You may ONLY use self.u and self.x[0] for estimation
-            raise NotImplementedError
+            if self.timeStep == 0:
+                self.previousState = self.x[0]
 
+            lastPhi = self.previousState[1]
+            model = [[-(self.r / (2 * self.d)), (self.r / (2 * self.d))],
+                        [(self.r * np.cos(lastPhi)) / 2, (self.r * np.cos(lastPhi)) / 2],
+                        [(self.r * np.sin(lastPhi)) / 2, (self.r * np.sin(lastPhi)) / 2],
+                        [1, 0],
+                        [0, 1]]
+            inputs = np.array([self.u[self.timeStep][1], self.u[self.timeStep][2]])
+
+            stateEstimate = self.x_hat[self.timeStep]
+            nextState = np.hstack((np.array([self.timeStep]), (model @ inputs)))
+
+            stateEstimate += (nextState * self.dt)
+            stateEstimate[0] = self.timeStep * self.dt
+            self.previousState = stateEstimate
+            
+            self.x_hat.append(stateEstimate)
+            self.timeStep += 1
+
+            # print("Step Model: ", stepModel)
+            # print("SM Shape: ", stepModel.shape)
+            # print("Inputs: ", inputs)
+            # print("Inputs Shape: ", inputs.shape)
+            # # print("Initial: ", initialState)
+            # # print("Initial Shape: ", initialState.shape)
+            # # print("Matrix Multiplication: ", stepModel @ inputs)
+            # print("step shape: ", (stepModel @ inputs).shape)
+            # print("NE Shape: ", nextState.shape)
+            # # print("nextState: ", nextState)
+            # # print("nextState type: ", type(nextState))
+            # print("State Estimate: ", stateEstimate)
+            # print("SE Shape: ", stateEstimate.shape)
 
 class KalmanFilter(Estimator):
     """Kalman filter estimator.
