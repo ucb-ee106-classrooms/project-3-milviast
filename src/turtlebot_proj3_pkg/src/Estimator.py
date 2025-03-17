@@ -77,7 +77,7 @@ class Estimator:
         self.x = []
         self.y = []
         self.x_hat = []  # Your estimates go here!
-        self.dt = 0.05
+        self.dt = 0.1
         self.fig, self.axd = plt.subplot_mosaic(
             [['xy', 'phi'],
              ['xy', 'x'],
@@ -263,11 +263,15 @@ class DeadReckoning(Estimator):
                         [0, 1]]
             inputs = np.array([self.u[self.timeStep][1], self.u[self.timeStep][2]])
 
-            stateEstimate = self.x_hat[self.timeStep]
-            nextState = np.hstack((np.array([self.timeStep]), (model @ inputs)))
+            stateEstimate = np.copy(self.x_hat[self.timeStep])
+            nextState = (model @ inputs)
 
-            stateEstimate += (nextState * self.dt)
-            stateEstimate[0] = self.timeStep * self.dt
+            stateEstimate = np.zeros(6)
+            stateEstimate[0] = self.previousState[0] + self.dt           
+            stateEstimate[1:] = self.previousState[1:] + nextState * self.dt  
+
+            # stateEstimate += (nextState * self.dt)
+            # stateEstimate[0] = self.timeStep * self.dt
             self.previousState = stateEstimate
             
             self.x_hat.append(stateEstimate)
