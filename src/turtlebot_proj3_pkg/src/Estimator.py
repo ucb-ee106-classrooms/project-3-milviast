@@ -117,6 +117,7 @@ class Estimator:
         raise NotImplementedError
 
     def plot_init(self):
+        print("WOAH")
         self.axd['xy'].set_title(self.canvas_title)
         self.axd['xy'].set_xlabel('x (m)')
         self.axd['xy'].set_ylabel('y (m)')
@@ -316,17 +317,62 @@ class KalmanFilter(Estimator):
         super().__init__()
         self.canvas_title = 'Kalman Filter'
         self.phid = np.pi / 4
+        self.t = 0
+        
         # TODO: Your implementation goes here!
         # You may define the A, C, Q, R, and P matrices below.
+        self.A = np.eye(4)
+        
+        self.C = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0]])
+                        #    [0, 0, 0, 0],
+                        #    [0, 0, 0, 0]])
+        self.Q = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+        # self.R = np.array([[1, 0, 0, 0],
+        #                    [0, 1, 0, 0],
+        #                    [0, 0, 1, 0],
+        #                    [0, 0, 0, 1]])
+        self.R = np.array([[1, 0],
+                           [0, 1]])
+        self.P = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
 
     # noinspection DuplicatedCode
     # noinspection PyPep8Naming
     def update(self, _):
-        if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
+        if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0] and len(self.u) > self.t:
             # TODO: Your implementation goes here!
             # You may use self.u, self.y, and self.x[0] for estimation
-            raise NotImplementedError
+            if self.t == 0:
+                self.previous_state = self.x[0]
 
+            phi = self.previous_state[1]
+            self.B = np.array([[(self.r/2) * np.cos(phi), (self.r/2) * np.cos(phi)],
+                                [(self.r/2) * np.sin(phi), (self.r/2) * np.sin(phi)],
+                                [1, 0],
+                                [0, 1]]) * self.dt
+            
+            # print("Previous State: ", self.previous_state)
+            next_x = self.A @ self.x_hat[self.t][2:] + self.B @ self.u[self.t][1:]
+            Pt1 = self.A @ self.P @ self.A.T + self.Q
+            Kt1 = Pt1 @ self.C.T @ np.linalg.inv(self.C @ Pt1 @ self.C.T + self.R)
+            next_state = next_x + Kt1 @ (self.y[self.t+1][1:] - (self.C @ next_x))
+            self.P = (np.eye(4) - (Kt1 @ self.C)) @ self.P
+
+            state_estimate = np.zeros(6)
+            state_estimate[0] = self.previous_state[0] + self.dt
+            state_estimate[1] = self.previous_state[1]# + (self.phid * self.dt))
+            state_estimate[2:] = self.previous_state[2:] + next_state * self.dt
+            print("State Estimate: ", state_estimate)
+
+            self.previous_state = state_estimate
+            self.x_hat.append(state_estimate)
+            self.t += 1
 
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):

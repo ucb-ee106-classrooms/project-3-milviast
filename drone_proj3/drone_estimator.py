@@ -243,6 +243,7 @@ class DeadReckoning(Estimator):
 
             self.previousState = stateEstimate            
             self.x_hat.append(stateEstimate)
+            
             self.index += 1
 
 # noinspection PyPep8Naming

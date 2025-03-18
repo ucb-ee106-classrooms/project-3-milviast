@@ -14,7 +14,7 @@ class Controller:
             obstacleQueue (ObstacleQueue): ObstacleQueue object, stores all barriers for the system to avoid
             uBounds ((Dynamics.inputDimn x 2) numpy array): minimum and maximum input values to the system
         """
-        #store input parameters
+        # store input parameters
         self.observer = observer
         self.lyapunov = lyapunov
         self.trajectory = trajectory

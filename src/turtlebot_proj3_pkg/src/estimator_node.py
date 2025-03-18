@@ -23,11 +23,12 @@ def spin(estimator):
         None
     """
     # noinspection PyUnusedLocal
+    # estimator.run()
     anim = FuncAnimation(
         estimator.fig,
         estimator.plot_update,
         init_func=estimator.plot_init,
-        cache_frame_data=False)
+        cache_frame_data=True)
     plt.show(block=True)  # This functions the same as rospy.spin()
 
 
