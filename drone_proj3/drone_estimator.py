@@ -279,26 +279,75 @@ class ExtendedKalmanFilter(Estimator):
         # You may define the Q, R, and P matrices below.
         self.A = None
         self.B = None
-        self.C = None
-        self.Q = None
-        self.R = None
-        self.P = None
+        self.C = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0]])
+        self.Q = np.eye(4)
+        self.R = np.eye(2)
+        self.P = np.eye(4)
 
     # noinspection DuplicatedCode
     def update(self, i):
         if len(self.x_hat) > 0: #and self.x_hat[-1][0] < self.x[-1][0]:
-            # TODO: Your implementation goes here!
             # You may use self.u, self.y, and self.x[0] for estimation
-            raise NotImplementedError
+            if self.t == 0:
+                self.previous_state = self.x[0]
+
+            self.B = np.array([[(self.r/2) * np.cos(self.phid), (self.r/2) * np.cos(self.phid)],
+                                [(self.r/2) * np.sin(self.phid), (self.r/2) * np.sin(self.phid)],
+                                [1, 0],
+                                [0, 1]]) * self.dt
+            
+            # State extrapolation
+            next_x = self.g(self.previous_state, self.u[i])
+
+            # Dynamics linearization
+            At = self.approx_A(self.previous_state, self.u[i])
+
+            # Covariance extrapolation
+            Pt1 = At @ self.P @ self.A.T + self.Q
+
+            # Measurement linearization
+            Ct = self.approx_C(next_x)
+
+            # Kalman gain
+            Kt1 = Pt1 @ Ct.T @ np.linalg.inv(Ct @ Pt1 @ Ct.T + self.R)
+
+            # State update
+            next_state = next_x + Kt1 @ (self.y[self.t+1][1:] - self.h(next_x, self.y[self.t+1][1:])) # double check y in self.h
+
+            # Covariance update
+            self.P = (np.eye(4) - (Kt1 @ self.C)) @ Pt1
+
+            # State estimate update
+            state_estimate = np.zeros(6)
+            state_estimate[0] = self.previous_state[0] + self.dt
+            state_estimate[1] = self.previous_state[1]# + (self.phid * self.dt))
+            state_estimate[2:] = next_state
+
+            self.previous_state = state_estimate
+            self.x_hat.append(state_estimate)
+            self.t += 1
 
     def g(self, x, u):
+        # Dynamics model
+        return np.vstack(x[3:], [0, -self.gr, 0]) + (np.array([0, 0],
+                                                             [0, 0],
+                                                             [0, 0],
+                                                             [-np.sin(x[2])/self.m, 0],
+                                                             [np.cos(x[2])/self.m, 0],
+                                                             [0, 1/self.J]) @ u) * self.dt
         raise NotImplementedError
 
     def h(self, x, y_obs):
+        # Measurement model
+        h = np.array([np.sqrt((self.landmark[0] - x[0])**2 + self.landmark[1]**2+ + (self.landmark[2] - x[1])**2)]
+                     [x[2]])
         raise NotImplementedError
 
     def approx_A(self, x, u):
+        # Linear approx of g w.r.t. x
         raise NotImplementedError
     
     def approx_C(self, x):
+        # Linear approx of h w.r.t. x
         raise NotImplementedError
