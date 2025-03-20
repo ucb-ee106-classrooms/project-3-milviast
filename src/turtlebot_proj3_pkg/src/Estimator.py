@@ -351,24 +351,35 @@ class KalmanFilter(Estimator):
             if self.t == 0:
                 self.previous_state = self.x[0]
 
-            phi = self.previous_state[1]
-            self.B = np.array([[(self.r/2) * np.cos(phi), (self.r/2) * np.cos(phi)],
-                                [(self.r/2) * np.sin(phi), (self.r/2) * np.sin(phi)],
+            # phi = self.previous_state[1]
+            self.B = np.array([[(self.r/2) * np.cos(self.phid), (self.r/2) * np.cos(self.phid)],
+                                [(self.r/2) * np.sin(self.phid), (self.r/2) * np.sin(self.phid)],
                                 [1, 0],
                                 [0, 1]]) * self.dt
             
             # print("Previous State: ", self.previous_state)
+
+            # State extrapolation
             next_x = self.A @ self.x_hat[self.t][2:] + self.B @ self.u[self.t][1:]
+            
+            # Covariance extrapolation
             Pt1 = self.A @ self.P @ self.A.T + self.Q
+            
+            # Kalman gain
             Kt1 = Pt1 @ self.C.T @ np.linalg.inv(self.C @ Pt1 @ self.C.T + self.R)
+            
+            # State update
             next_state = next_x + Kt1 @ (self.y[self.t+1][1:] - (self.C @ next_x))
-            self.P = (np.eye(4) - (Kt1 @ self.C)) @ self.P
+            # self.P = (np.eye(4) - (Kt1 @ self.C)) @ self.P
+            
+            # Covariance update
+            self.P = (np.eye(4) - (Kt1 @ self.C)) @ Pt1
 
             state_estimate = np.zeros(6)
             state_estimate[0] = self.previous_state[0] + self.dt
             state_estimate[1] = self.previous_state[1]# + (self.phid * self.dt))
-            state_estimate[2:] = self.previous_state[2:] + next_state * self.dt
-            print("State Estimate: ", state_estimate)
+            state_estimate[2:] = next_state
+            # print("State Estimate: ", state_estimate)
 
             self.previous_state = state_estimate
             self.x_hat.append(state_estimate)
