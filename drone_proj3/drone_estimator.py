@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 plt.rcParams['font.family'] = ['Arial']
 plt.rcParams['font.size'] = 14
 
@@ -100,6 +101,9 @@ class Estimator:
                 self.x_hat.append(self.x[-1])
             else:
                 self.update(i)
+        average_runtime = np.mean(self.update_runtimes)
+        print(f"Average update runtime: {average_runtime:.6f} seconds")
+        print('Mean Squared Error: ', np.mean(np.square(np.array(self.x) - np.array(self.x_hat))))
         return self.x_hat
 
     def update(self, _):
@@ -203,17 +207,20 @@ class DeadReckoning(Estimator):
         $ python drone_estimator_node.py --estimator dead_reckoning
     """
     def __init__(self, is_noisy=False):
-        super().__init__(is_noisy)
+        super().__init__(False)
         self.index = 0
         self.previousState = 0
         self.canvas_title = 'Dead Reckoning'
+        self.update_runtimes = []
 
     def update(self, _):
+        start_time = time.time()  # Start timing
+
         if len(self.x_hat) > 0 and len(self.u) > self.index:
             # TODO: Your implementation goes here!
             # You may ONLY use self.u and self.x[0] for estimation
             if self.index == 0:
-                self.previousState = self.x[0]            
+                self.previousState = self.x[0]
             lastPhi = self.previousState[2]
             model = np.array([[0, 0],
                         [0, 0],
@@ -246,6 +253,10 @@ class DeadReckoning(Estimator):
             
             self.index += 1
 
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+        self.update_runtimes.append(elapsed_time)  # Store runtime
+
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):
     """Extended Kalman filter estimator.
@@ -275,79 +286,120 @@ class ExtendedKalmanFilter(Estimator):
     def __init__(self, is_noisy=False):
         super().__init__(is_noisy)
         self.canvas_title = 'Extended Kalman Filter'
-        # TODO: Your implementation goes here!
-        # You may define the Q, R, and P matrices below.
-        self.A = None
+        self.A = np.array([[1, 0, 0, 0, 0, 0],
+                           [0, 1, 0, 0, 0, 0],
+                           [0, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 1, 0],
+                           [0, 0, 0, 0, 0, 1]])
         self.B = None
-        self.C = np.array([[1, 0, 0, 0],
-                           [0, 1, 0, 0]])
-        self.Q = np.eye(4)
-        self.R = np.eye(2)
-        self.P = np.eye(4)
+        self.C = np.array([[0, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0]])
+        self.Q = np.array([[1, 0, 0, 0, 0, 0],
+                           [0, 1, 0, 0, 0, 0],
+                           [0, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 1, 0],
+                           [0, 0, 0, 0, 0, 1]])
+        self.R = np.array([[1, 0],
+                           [0, 1]])
+        self.P = np.array([[1, 0, 0, 0, 0, 0],
+                           [0, 1, 0, 0, 0, 0],
+                           [0, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 1, 0],
+                           [0, 0, 0, 0, 0, 1]])
+        self.previous_state = None
+        self.index = 0
+        self.update_runtimes = []
 
     # noinspection DuplicatedCode
     def update(self, i):
-        if len(self.x_hat) > 0: #and self.x_hat[-1][0] < self.x[-1][0]:
-            # You may use self.u, self.y, and self.x[0] for estimation
-            if self.t == 0:
-                self.previous_state = self.x[0]
+        start_time = time.time()
 
-            self.B = np.array([[(self.r/2) * np.cos(self.phid), (self.r/2) * np.cos(self.phid)],
-                                [(self.r/2) * np.sin(self.phid), (self.r/2) * np.sin(self.phid)],
-                                [1, 0],
-                                [0, 1]]) * self.dt
+        if len(self.x_hat) > 0: # and self.x_hat[-1][0] < self.x[-1][0]:
+            # You may use self.u, self.y, and self.x[0] for estimation
+            if self.index== 0:
+                self.previous_state = self.x[0]
             
             # State extrapolation
-            next_x = self.g(self.previous_state, self.u[i])
+            next_x = self.g(self.previous_state, self.u[-1])
+            # print("next_x: ", next_x)
 
             # Dynamics linearization
-            At = self.approx_A(self.previous_state, self.u[i])
+            At = self.approx_A(self.previous_state, self.u[-1])
+            # print("At: ", At)
 
             # Covariance extrapolation
             Pt1 = At @ self.P @ self.A.T + self.Q
+            # print("Pt1: ", Pt1)
 
             # Measurement linearization
             Ct = self.approx_C(next_x)
+            # print("Ct: ", Ct)
 
             # Kalman gain
             Kt1 = Pt1 @ Ct.T @ np.linalg.inv(Ct @ Pt1 @ Ct.T + self.R)
+            # print("Kt1: ", Kt1)
+            # print("Kt1 Shape: ", Kt1.shape)
+
+            # print("self.y[-1]: ", np.array(self.y[-1]))
+            # print("self.y[-1] shape: ", np.array(self.y[-1]).shape)
+            # print("self.h(next_x, None): ", self.h(next_x, None))
+            # print("h shape: ", self.h(next_x, None).shape)
+            # print("Kt1 @ (self.y[-1] - self.h(next_x, None): ", Kt1 @ (self.y[-1] - self.h(next_x, None)))
+            # print("Mult shape: ", (Kt1 @ (self.y[-1] - self.h(next_x, None))).shape)
 
             # State update
-            next_state = next_x + Kt1 @ (self.y[self.t+1][1:] - self.h(next_x, self.y[self.t+1][1:])) # double check y in self.h
+            next_state = next_x + Kt1 @ (self.y[-1] - self.h(next_x, None)) # double check y in self.h
 
             # Covariance update
-            self.P = (np.eye(4) - (Kt1 @ self.C)) @ Pt1
+            self.P = (np.eye(6) - (Kt1 @ self.C)) @ Pt1
 
             # State estimate update
             state_estimate = np.zeros(6)
-            state_estimate[0] = self.previous_state[0] + self.dt
-            state_estimate[1] = self.previous_state[1]# + (self.phid * self.dt))
-            state_estimate[2:] = next_state
+            # print("State Estimate: ", state_estimate)
+            # print("Next State: ", next_state)
+            state_estimate = next_state
 
             self.previous_state = state_estimate
             self.x_hat.append(state_estimate)
-            self.t += 1
+            self.index += 1
+        
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+        self.update_runtimes.append(elapsed_time)  # Store runtime
 
     def g(self, x, u):
         # Dynamics model
-        return np.vstack(x[3:], [0, -self.gr, 0]) + (np.array([0, 0],
+        f = np.hstack((x[3:], [0, -self.gr, 0])) + np.array(([0, 0],
                                                              [0, 0],
                                                              [0, 0],
                                                              [-np.sin(x[2])/self.m, 0],
                                                              [np.cos(x[2])/self.m, 0],
-                                                             [0, 1/self.J]) @ u) * self.dt
-        raise NotImplementedError
+                                                             [0, 1/self.J])) @ u 
+        
+        return x + f * self.dt
 
     def h(self, x, y_obs):
         # Measurement model
-        h = np.array([np.sqrt((self.landmark[0] - x[0])**2 + self.landmark[1]**2+ + (self.landmark[2] - x[1])**2)]
-                     [x[2]])
-        raise NotImplementedError
+        h = np.array(([np.sqrt((self.landmark[0] - x[0])**2 + self.landmark[1]**2 + (self.landmark[2] - x[1])**2), x[2]]))
+        return h
 
     def approx_A(self, x, u):
         # Linear approx of g w.r.t. x
-        raise NotImplementedError
+        A = np.eye(6)
+        A[0, 3] = self.dt
+        A[1, 4] = self.dt
+        A[2, 5] = self.dt
+        A[3, 2] = -np.cos(x[2]) * u[0] * self.dt / self.m
+        A[4, 2] = -np.sin(x[2]) * u[0] * self.dt / self.m
+        return A
     
     def approx_C(self, x):
         # Linear approx of h w.r.t. x
-        raise NotImplementedError
+        distance = np.sqrt((self.landmark[0] - x[0])**2 + self.landmark[1]**2 + (self.landmark[2] - x[1])**2)
+        C = np.zeros((2, 6))
+        C[0, 0] = (x[0] - self.landmark[0]) / distance
+        C[0, 1] = (x[1] - self.landmark[1]) / distance
+        return C

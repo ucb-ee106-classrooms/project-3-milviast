@@ -2,6 +2,7 @@ import rospy
 from std_msgs.msg import Float32MultiArray
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 plt.rcParams['font.family'] = ['FreeSans', 'Helvetica', 'Arial']
 plt.rcParams['font.size'] = 14
 
@@ -238,7 +239,7 @@ class DeadReckoning(Estimator):
     To run dead reckoning:
         $ roslaunch proj3_pkg unicycle_bringup.launch \
             estimator_type:=dead_reckoning \
-            noise_injection:=true \
+            noise_injection:=false \
             freeze_bearing:=false
     For debugging, you can simulate a noise-free unicycle model by setting
     noise_injection:=false.
@@ -248,8 +249,11 @@ class DeadReckoning(Estimator):
         self.timeStep = 0
         self.previousState = 0
         self.canvas_title = 'Dead Reckoning'
+        self.update_runtimes = []  # List to store update runtimes
 
     def update(self, _):
+        start_time = time.time()  # Start timing
+
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0] and len(self.u) > self.timeStep:
             # TODO: Your implementation goes here!
             # You may ONLY use self.u and self.x[0] for estimation
@@ -277,6 +281,10 @@ class DeadReckoning(Estimator):
             self.x_hat.append(stateEstimate)
             self.timeStep += 1
 
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+        self.update_runtimes.append(elapsed_time)  # Store runtime
+
             # print("Step Model: ", stepModel)
             # print("SM Shape: ", stepModel.shape)
             # print("Inputs: ", inputs)
@@ -290,6 +298,12 @@ class DeadReckoning(Estimator):
             # # print("nextState type: ", type(nextState))
             # print("State Estimate: ", stateEstimate)
             # print("SE Shape: ", stateEstimate.shape)
+
+    def postProcessing(self):
+        # Calculate the average runtime
+        average_runtime = np.mean(self.update_runtimes)
+        print(f"Average update runtime: {average_runtime:.6f} seconds")
+        print('Mean Squared Error: ', np.mean(np.square(np.array(self.x) - np.array(self.x_hat))))
 
 class KalmanFilter(Estimator):
     """Kalman filter estimator.
@@ -341,10 +355,14 @@ class KalmanFilter(Estimator):
                            [0, 1, 0, 0],
                            [0, 0, 1, 0],
                            [0, 0, 0, 1]])
+        
+        self.update_runtimes = []  # List to store update runtimes
 
     # noinspection DuplicatedCode
     # noinspection PyPep8Naming
     def update(self, _):
+        start_time = time.time()  # Start timing
+
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0] and len(self.u) > self.t:
             # TODO: Your implementation goes here!
             # You may use self.u, self.y, and self.x[0] for estimation
@@ -384,6 +402,16 @@ class KalmanFilter(Estimator):
             self.previous_state = state_estimate
             self.x_hat.append(state_estimate)
             self.t += 1
+        
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+        self.update_runtimes.append(elapsed_time)  # Store runtime
+
+    def postProcessing(self):
+        # Calculate the average runtime
+        average_runtime = np.mean(self.update_runtimes)
+        print(f"Average update runtime: {average_runtime:.6f} seconds")
+        print('Mean Squared Error: ', np.mean(np.square(np.array(self.x) - np.array(self.x_hat))))
 
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):

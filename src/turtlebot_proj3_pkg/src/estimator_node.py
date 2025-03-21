@@ -54,6 +54,7 @@ def main():
             'Estimator type {} not supported'.format(estimator_type))
     rospy.loginfo('Invoking estimator {}...'.format(estimator_type))
     spin(estimator)
+    estimator.postProcessing()
 
 
 if __name__ == '__main__':
